@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { DragDropContext, Droppable, Draggable, DropResult } from "react-beautiful-dnd"
 import { useAuth } from "@/contexts/AuthContext"
 import { supabase } from "@/lib/supabase"
@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Plus, Search, LogOut, CheckCircle, Circle, Clock, AlertTriangle, Users } from "lucide-react"
+import { Prisma } from "@prisma/client"
 
 type UserSlim = {
   id: string;
@@ -114,6 +115,101 @@ export function DashboardClient({
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
+
+  // Daten werden bereits von der Server-Komponente geladen
+
+
+      // Hole Buckets mit Tasks
+      const { data: bucketsData } = await supabase
+        .from('buckets')
+        .select(`
+          *,
+          tasks (
+            *,
+            user:profiles (
+              id,
+              name,
+              email
+            ),
+            bucket:buckets (
+              id,
+              name
+            ),
+            project:projects (
+              id,
+              name
+            )
+          )
+        `)
+        .eq('organization_id', membership.organization_id)
+        .order('order_index', { ascending: true })
+
+      // Hole alle Tasks in der Organisation
+      const { data: tasksData } = await supabase
+        .from('tasks')
+        .select(`
+          *,
+          user:profiles (
+            id,
+            name,
+            email
+          ),
+          bucket:buckets (
+            id,
+            name
+          ),
+          project:projects (
+            id,
+            name
+          )
+        `)
+        .eq('organization_id', membership.organization_id)
+        .order('created_at', { ascending: false })
+
+      console.log('Loaded buckets:', bucketsData?.length || 0)
+      console.log('Loaded tasks:', tasksData?.length || 0)
+      console.log('Organization:', membership.organization_id)
+      console.log('User:', user.id)
+      
+      setBuckets(bucketsData || [])
+      setTasks(tasksData || [])
+
+          // Wenn keine Buckets vorhanden sind, zeige Fehler
+          if (!bucketsData || bucketsData.length === 0) {
+            console.log('No buckets found for organization:', membership.organization_id)
+            setError('Keine Buckets gefunden. Bitte kontaktieren Sie den Administrator.')
+            return
+          }
+
+      // Berechne Stats
+      const totalTasks = tasksData?.length || 0
+      const openTasks = tasksData?.filter(t => t.status === 'open').length || 0
+      const completedTasks = 0 // TODO: Implement completed tasks query
+      const todayTasks = 0 // TODO: Implement today's tasks query
+      const overdueTasks = 0 // TODO: Implement overdue tasks query
+
+      setStats({
+        totalTasks,
+        openTasks,
+        completedTasks,
+        todayTasks,
+        overdueTasks,
+        completedThisWeek: 0,
+        daysSinceOldest: 0,
+        organization: {
+          id: membership.organization_id,
+          name: (membership.organizations as any).name
+        }
+      })
+
+    } catch (error) {
+      console.error('Error loading dashboard data:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+
 
   const handleDragEnd = async (result: DropResult) => {
     if (!result.destination) return
@@ -311,14 +407,6 @@ export function DashboardClient({
     }
   }
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
-      </div>
-    )
-  }
-
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -329,38 +417,38 @@ export function DashboardClient({
               <h1 className="text-xl font-semibold text-gray-900">Easy Tasks</h1>
               <p className="text-sm text-gray-600">{organization.name}</p>
             </div>
-            <div className="flex items-center space-x-4">
-              <span className="text-sm text-gray-600">Hallo, {profile?.name || user?.email}</span>
-              {(userRole === 'owner' || userRole === 'admin') && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => window.location.href = '/users'}
-                >
-                  <Users className="w-4 h-4 mr-2" />
-                  Benutzer
-                </Button>
-              )}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => signOut()}
-              >
-                <LogOut className="w-4 h-4 mr-2" />
-                Abmelden
-              </Button>
-            </div>
+                <div className="flex items-center space-x-4">
+                  <span className="text-sm text-gray-600">Hallo, {profile?.name || user?.email}</span>
+                  {(userRole === 'owner' || userRole === 'admin') && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => window.location.href = '/users'}
+                    >
+                      <Users className="w-4 h-4 mr-2" />
+                      Benutzer
+                    </Button>
+                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => signOut()}
+                  >
+                    <LogOut className="w-4 h-4 mr-2" />
+                    Abmelden
+                  </Button>
+                </div>
           </div>
         </div>
       </header>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Error Display */}
-        {error && (
-          <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md mb-6">
-            {error}
-          </div>
-        )}
+            {/* Error Display */}
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md mb-6">
+                {error}
+              </div>
+            )}
 
         {/* Success Display */}
         {success && (
@@ -401,7 +489,7 @@ export function DashboardClient({
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Überfällig</CardTitle>
-              <AlertTriangle className="h-4 w-4 text-red-600" />
+              <AlertTriangle className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-red-600">{stats.overdueTasks}</div>
