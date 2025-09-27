@@ -19,25 +19,54 @@ type UserSlim = {
   image?: string | null;
 };
 
-type TaskWithRels = Prisma.TaskGetPayload<{
-  include: {
-    user: { select: { id: true; name: true; email: true } };
-    bucket: true;
-    project: true;
+// Supabase types for tasks and buckets
+type TaskWithRels = {
+  id: string;
+  title: string;
+  description: string | null;
+  priority: string;
+  status: string;
+  due_date: string | null;
+  category: string | null;
+  notes: string | null;
+  assigned_to: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  completed_by: string | null;
+  user_id: string;
+  organization_id: string;
+  project_id: string | null;
+  bucket_id: string | null;
+  created_at: string;
+  updated_at: string;
+  user: {
+    id: string;
+    name: string | null;
+    email: string;
   };
-}>;
+  bucket: {
+    id: string;
+    name: string;
+  } | null;
+  project: {
+    id: string;
+    name: string;
+  } | null;
+};
 
-type BucketWithTasks = Prisma.BucketGetPayload<{
-  include: {
-    tasks: {
-      include: {
-        user: { select: { id: true; name: true; email: true } };
-        bucket: true;
-        project: true;
-      };
-    };
-  };
-}>;
+type BucketWithTasks = {
+  id: string;
+  name: string;
+  type: string;
+  color: string;
+  order_index: number;
+  user_id: string;
+  organization_id: string;
+  project_id: string | null;
+  created_at: string;
+  updated_at: string;
+  tasks: TaskWithRels[];
+};
 
 interface DashboardStats {
   totalTasks: number
@@ -609,9 +638,9 @@ export function DashboardClient() {
                                     <span className={`text-xs ${getPriorityColor(task.priority)}`}>
                                       {getPriorityIcon(task.priority)}
                                     </span>
-                                    {task.dueDate && (
+                                    {task.due_date && (
                                       <span className="text-xs text-gray-500">
-                                        {new Date(task.dueDate).toLocaleDateString('de-DE')}
+                                        {new Date(task.due_date).toLocaleDateString('de-DE')}
                                       </span>
                                     )}
                                     {(userRole === 'owner' || userRole === 'admin') && task.user && (
