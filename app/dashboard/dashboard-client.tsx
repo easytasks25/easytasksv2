@@ -9,31 +9,27 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Plus, Search, LogOut, CheckCircle, Circle, Clock, AlertTriangle } from "lucide-react"
+import { Prisma } from "@prisma/client"
 
-interface Task {
-  id: string
-  title: string
-  description?: string
-  priority: string
-  status: string
-  dueDate?: string
-  bucketId?: string
-  createdAt: string
-  user: {
-    id: string
-    name?: string
-    email: string
-  }
-}
+type TaskWithRels = Prisma.TaskGetPayload<{
+  include: { 
+    user: true; 
+    bucket: true; 
+    project: true 
+  };
+}>;
 
-interface Bucket {
-  id: string
-  name: string
-  type: string
-  color: string
-  order: number
-  tasks: Task[]
-}
+type BucketWithTasks = Prisma.BucketGetPayload<{
+  include: {
+    tasks: {
+      include: {
+        user: true;
+        bucket: true;
+        project: true;
+      };
+    };
+  };
+}>;
 
 interface DashboardStats {
   totalTasks: number
@@ -50,8 +46,8 @@ interface DashboardStats {
 }
 
 interface DashboardClientProps {
-  initialBuckets: Bucket[]
-  initialTasks: Task[]
+  initialBuckets: BucketWithTasks[]
+  initialTasks: TaskWithRels[]
   initialStats: DashboardStats
   user: {
     id: string
@@ -71,8 +67,8 @@ export function DashboardClient({
   user, 
   organization 
 }: DashboardClientProps) {
-  const [buckets, setBuckets] = useState<Bucket[]>(initialBuckets)
-  const [tasks, setTasks] = useState<Task[]>(initialTasks)
+  const [buckets, setBuckets] = useState<BucketWithTasks[]>(initialBuckets)
+  const [tasks, setTasks] = useState<TaskWithRels[]>(initialTasks)
   const [stats, setStats] = useState<DashboardStats>(initialStats)
   const [searchTerm, setSearchTerm] = useState("")
   const [hideCompleted, setHideCompleted] = useState(true)

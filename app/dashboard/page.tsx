@@ -38,6 +38,17 @@ export default async function DashboardPage() {
           where: {
             status: 'open'
           },
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true
+              }
+            },
+            bucket: true,
+            project: true
+          },
           orderBy: {
             createdAt: 'desc'
           }
@@ -54,6 +65,7 @@ export default async function DashboardPage() {
       },
       include: {
         bucket: true,
+        project: true,
         user: {
           select: {
             id: true,
