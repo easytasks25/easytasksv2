@@ -71,6 +71,7 @@ export function DashboardClient() {
   const [searchTerm, setSearchTerm] = useState("")
   const [hideCompleted, setHideCompleted] = useState(true)
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState("")
 
   // Lade Dashboard-Daten
   useEffect(() => {
@@ -100,8 +101,9 @@ export function DashboardClient() {
         .single()
 
       if (!membership || !membership.organizations) {
-        // Redirect to organization creation
-        window.location.href = '/organizations/create'
+        // This should not happen anymore since we create default organization on signup
+        console.error('No organization found for user')
+        setError('Keine Organisation gefunden. Bitte melden Sie sich ab und erneut an.')
         return
       }
 

@@ -95,8 +95,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { error }
       }
 
-      // Create profile after successful signup
+      // Create profile and default organization after successful signup
       if (data.user) {
+        // Create profile first
         const { error: profileError } = await supabase
           .from('profiles')
           .insert({
@@ -107,6 +108,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (profileError) {
           console.error('Error creating profile:', profileError)
+          return { error: profileError as AuthError }
+        }
+
+        // Create default organization
+        const { data: organization, error: orgError } = await supabase
+          .from('organizations')
+          .insert({
+            name: name ? `${name}'s Team` : 'Mein Team',
+            description: 'Standard-Organisation',
+            type: 'team',
+            created_by: data.user.id
+          })
+          .select()
+          .single()
+
+        if (orgError) {
+          console.error('Error creating organization:', orgError)
+          return { error: orgError as AuthError }
+        }
+
+        // Add user as owner to the organization
+        const { error: membershipError } = await supabase
+          .from('user_organizations')
+          .insert({
+            user_id: data.user.id,
+            organization_id: organization.id,
+            role: 'owner',
+            is_active: true
+          })
+
+        if (membershipError) {
+          console.error('Error creating membership:', membershipError)
+          return { error: membershipError as AuthError }
         }
       }
 
