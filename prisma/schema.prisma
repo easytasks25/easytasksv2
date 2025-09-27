@@ -20,7 +20,7 @@ model User {
   id        String   @id @default(cuid())
   email     String   @unique
   name      String?
-  password  String   // hashed
+  password  String // hashed
   avatar    String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -29,7 +29,7 @@ model User {
   tasks       Task[]
   buckets     Bucket[]
   notes       Note[]
-  createdOrgs Organization[] @relation("OrganizationCreatedBy")
+  createdOrgs Organization[]     @relation("OrganizationCreatedBy")
   invitations Invitation[]
 
   // ⬇️ NEU: Gegenrelation zu ProjectUser
@@ -47,7 +47,7 @@ model Organization {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  createdBy   User      @relation("OrganizationCreatedBy", fields: [createdById], references: [id])
+  createdBy   User               @relation("OrganizationCreatedBy", fields: [createdById], references: [id])
   memberships UserOrganization[]
   projects    Project[]
   tasks       Task[]
@@ -60,12 +60,12 @@ model UserOrganization {
   id             String   @id @default(cuid())
   userId         String
   organizationId String
-  role           String   // "owner" | "admin" | "member"
+  role           String // "owner" | "admin" | "member"
   joinedAt       DateTime @default(now())
   isActive       Boolean  @default(true)
 
-  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@unique([userId, organizationId])
 }
@@ -79,11 +79,11 @@ model Project {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  organization   Organization @relation(fields: [organizationId], references: [id])
-  users          ProjectUser[]
-  tasks          Task[]
-  buckets        Bucket[]
-  notes          Note[]
+  organization Organization  @relation(fields: [organizationId], references: [id])
+  users        ProjectUser[]
+  tasks        Task[]
+  buckets      Bucket[]
+  notes        Note[]
 }
 
 model ProjectUser {
@@ -93,18 +93,18 @@ model ProjectUser {
   role      String
   joinedAt  DateTime @default(now())
 
-  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@unique([userId, projectId])
 }
 
 model Bucket {
-  id             String   @id @default(cuid())
+  id             String  @id @default(cuid())
   name           String
-  type           String   // "day" | "custom"
-  color          String   @default("#e5efe9")
-  order          Int      @default(0)
+  type           String // "day" | "custom"
+  color          String  @default("#e5efe9")
+  order          Int     @default(0)
   userId         String
   organizationId String
   projectId      String?
@@ -120,15 +120,15 @@ model Bucket {
 }
 
 model Task {
-  id             String   @id @default(cuid())
+  id             String    @id @default(cuid())
   title          String
   description    String?
-  priority       String   // "low" | "med" | "high"
-  status         String   // "open" | "done"
+  priority       String // "low" | "med" | "high"
+  status         String // "open" | "done"
   dueDate        DateTime?
   category       String?
   notes          String?
-  assignedTo     String?  // userId
+  assignedTo     String? // userId
   startedAt      DateTime?
   completedAt    DateTime?
   completedBy    String?
@@ -152,7 +152,7 @@ model Note {
   content        String
   category       String
   tags           String[]
-  isPinned       Boolean   @default(false)
+  isPinned       Boolean  @default(false)
   userId         String
   organizationId String
   projectId      String?
@@ -166,16 +166,16 @@ model Note {
 }
 
 model Invitation {
-  id             String   @id @default(cuid())
+  id             String    @id @default(cuid())
   email          String
   organizationId String
   role           String
-  token          String   @unique
+  token          String    @unique
   expiresAt      DateTime
   acceptedAt     DateTime?
   invitedById    String
-  createdAt      DateTime @default(now())
+  createdAt      DateTime  @default(now())
 
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  invitedBy      User         @relation(fields: [invitedById], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  invitedBy    User         @relation(fields: [invitedById], references: [id])
 }
