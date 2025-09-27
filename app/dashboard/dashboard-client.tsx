@@ -193,30 +193,35 @@ export function DashboardClient() {
   }
 
   const createDefaultBuckets = async () => {
+    if (!user || !organization.id) return
+
     try {
       const defaultBuckets = [
-        { name: "Heute", type: "day", color: "#fef3c7" },
-        { name: "Morgen", type: "day", color: "#dbeafe" },
-        { name: "Backlog", type: "custom", color: "#e5efe9" }
+        { name: "Heute", type: "day", color: "#fef3c7", order_index: 1 },
+        { name: "Morgen", type: "day", color: "#dbeafe", order_index: 2 },
+        { name: "Backlog", type: "custom", color: "#e5efe9", order_index: 3 }
       ]
 
-      for (let i = 0; i < defaultBuckets.length; i++) {
-        const bucket = defaultBuckets[i]
-        await fetch("/api/buckets", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
+      for (const bucket of defaultBuckets) {
+        const { error } = await supabase
+          .from('buckets')
+          .insert({
             name: bucket.name,
             type: bucket.type,
-            color: bucket.color
+            color: bucket.color,
+            order_index: bucket.order_index,
+            user_id: user.id,
+            organization_id: organization.id,
+            project_id: null
           })
-        })
+
+        if (error) {
+          console.error("Fehler beim Erstellen des Buckets:", error)
+        }
       }
 
       // Lade Buckets neu
-      const response = await fetch("/api/buckets")
-      const data = await response.json()
-      setBuckets(data.buckets)
+      await loadDashboardData()
     } catch (error) {
       console.error("Fehler beim Erstellen der Standard-Buckets:", error)
     }
@@ -239,22 +244,23 @@ export function DashboardClient() {
 
     // Update Task in der Datenbank
     try {
-      const response = await fetch(`/api/tasks/${task.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          bucketId: destBucket.id
+      const { error } = await supabase
+        .from('tasks')
+        .update({
+          bucket_id: destBucket.id
         })
-      })
+        .eq('id', task.id)
 
-      if (!response.ok) {
-        throw new Error("Fehler beim Aktualisieren der Task")
+      if (error) {
+        console.error("Fehler beim Aktualisieren der Task:", error)
+        setError("Fehler beim Verschieben der Aufgabe")
+        return
       }
 
       // Update lokalen State
       setTasks(prevTasks => 
         prevTasks.map(t => 
-          t.id === task.id ? { ...t, bucketId: destBucket.id } : t
+          t.id === task.id ? { ...t, bucket_id: destBucket.id } : t
         )
       )
 
@@ -269,7 +275,7 @@ export function DashboardClient() {
           if (bucket.id === destination.droppableId) {
             return {
               ...bucket,
-              tasks: [...bucket.tasks, { ...task, bucketId: destBucket.id }]
+              tasks: [...bucket.tasks, { ...task, bucket_id: destBucket.id }]
             }
           }
           return bucket
@@ -281,26 +287,40 @@ export function DashboardClient() {
   }
 
   const toggleTaskStatus = async (taskId: string, currentStatus: string) => {
+    if (!user) return
+
     try {
       const newStatus = currentStatus === 'open' ? 'done' : 'open'
       
-      const response = await fetch(`/api/tasks/${taskId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const { error } = await supabase
+        .from('tasks')
+        .update({
           status: newStatus,
-          completedAt: newStatus === 'done' ? new Date().toISOString() : null
+          completed_at: newStatus === 'done' ? new Date().toISOString() : null,
+          completed_by: newStatus === 'done' ? user.id : null
         })
-      })
+        .eq('id', taskId)
 
-      if (!response.ok) {
-        throw new Error("Fehler beim Aktualisieren der Task")
+      if (error) {
+        console.error("Fehler beim Aktualisieren der Task:", error)
+        setError("Fehler beim Aktualisieren der Aufgabe")
+        return
       }
 
       setTasks(prevTasks => 
         prevTasks.map(t => 
           t.id === taskId ? { ...t, status: newStatus } : t
         )
+      )
+
+      // Update buckets with new task status
+      setBuckets(prevBuckets =>
+        prevBuckets.map(bucket => ({
+          ...bucket,
+          tasks: bucket.tasks.map(t =>
+            t.id === taskId ? { ...t, status: newStatus } : t
+          )
+        }))
       )
 
       // Update Stats
@@ -311,35 +331,57 @@ export function DashboardClient() {
       }))
     } catch (error) {
       console.error("Fehler beim Ändern des Task-Status:", error)
+      setError("Fehler beim Aktualisieren der Aufgabe")
     }
   }
 
   const addNewTask = async (bucketId: string) => {
     const title = prompt("Task-Titel eingeben:")
-    if (!title) return
+    if (!title || !user || !organization.id) return
 
     try {
-      const response = await fetch("/api/tasks", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const { data: newTask, error } = await supabase
+        .from('tasks')
+        .insert({
           title,
-          bucketId
+          description: null,
+          priority: 'med',
+          status: 'open',
+          user_id: user.id,
+          organization_id: organization.id,
+          bucket_id: bucketId,
+          project_id: null
         })
-      })
+        .select(`
+          *,
+          user:profiles (
+            id,
+            name,
+            email
+          ),
+          bucket:buckets (
+            id,
+            name
+          ),
+          project:projects (
+            id,
+            name
+          )
+        `)
+        .single()
 
-      if (!response.ok) {
-        throw new Error("Fehler beim Erstellen der Task")
+      if (error) {
+        console.error("Fehler beim Erstellen der Task:", error)
+        setError("Fehler beim Erstellen der Aufgabe")
+        return
       }
 
-      const newTask = await response.json()
-      
-      setTasks(prevTasks => [newTask.task, ...prevTasks])
+      setTasks(prevTasks => [newTask, ...prevTasks])
       
       setBuckets(prevBuckets => 
         prevBuckets.map(bucket => 
           bucket.id === bucketId 
-            ? { ...bucket, tasks: [newTask.task, ...bucket.tasks] }
+            ? { ...bucket, tasks: [newTask, ...bucket.tasks] }
             : bucket
         )
       )
@@ -351,6 +393,7 @@ export function DashboardClient() {
       }))
     } catch (error) {
       console.error("Fehler beim Erstellen der Task:", error)
+      setError("Fehler beim Erstellen der Aufgabe")
     }
   }
 

@@ -142,6 +142,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.error('Error creating membership:', membershipError)
           return { error: { message: membershipError.message } as AuthError }
         }
+
+        // Create default buckets for the new user
+        const defaultBuckets = [
+          { name: "Heute", type: "day", color: "#fef3c7", order_index: 1 },
+          { name: "Morgen", type: "day", color: "#dbeafe", order_index: 2 },
+          { name: "Backlog", type: "custom", color: "#e5efe9", order_index: 3 }
+        ]
+
+        for (const bucket of defaultBuckets) {
+          const { error: bucketError } = await supabaseAdmin
+            .from('buckets')
+            .insert({
+              name: bucket.name,
+              type: bucket.type,
+              color: bucket.color,
+              order_index: bucket.order_index,
+              user_id: data.user.id,
+              organization_id: organization.id,
+              project_id: null
+            })
+
+          if (bucketError) {
+            console.error('Error creating default bucket:', bucketError)
+            // Don't fail the entire signup for bucket creation errors
+          }
+        }
       }
 
       return { error: null }
