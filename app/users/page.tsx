@@ -97,7 +97,7 @@ export default function UsersPage() {
         return
       }
 
-      const formattedUsers = usersData.map(u => ({
+      const formattedUsers = usersData.map((u: any) => ({
         id: u.profiles.id,
         email: u.profiles.email,
         name: u.profiles.name,
@@ -344,29 +344,29 @@ export default function UsersPage() {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {users.map((user) => (
-                    <div key={user.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                  {users.map((userItem) => (
+                    <div key={userItem.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                       <div className="flex items-center space-x-3">
-                        {getRoleIcon(user.role)}
+                        {getRoleIcon(userItem.role)}
                         <div>
                           <p className="font-medium text-gray-900">
-                            {user.name || user.email}
+                            {userItem.name || userItem.email}
                           </p>
-                          <p className="text-sm text-gray-600">{user.email}</p>
+                          <p className="text-sm text-gray-600">{userItem.email}</p>
                           <p className="text-xs text-gray-500">
-                            {getRoleLabel(user.role)} • Seit {new Date(user.joined_at).toLocaleDateString('de-DE')}
+                            {getRoleLabel(userItem.role)} • Seit {new Date(userItem.joined_at).toLocaleDateString('de-DE')}
                           </p>
                         </div>
                       </div>
                       <div className="flex items-center space-x-2">
                         <span className="text-sm text-gray-500">
-                          {getRoleLabel(user.role)}
+                          {getRoleLabel(userItem.role)}
                         </span>
-                        {user.id !== user?.id && userRole === 'owner' && (
+                        {userItem.id !== user?.id && userRole === 'owner' && (
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => removeUser(user.id)}
+                            onClick={() => removeUser(userItem.id)}
                             className="text-red-600 hover:text-red-700"
                           >
                             <Trash2 className="w-4 h-4" />
