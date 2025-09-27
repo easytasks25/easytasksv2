@@ -240,15 +240,13 @@ export function DashboardClient() {
     if (!user) return
 
     try {
-      setError('Repariere Benutzer-Setup...')
+      setError('Repariere komplettes Benutzer-Setup...')
       
-      const response = await fetch('/api/debug/fix-user', {
+      const response = await fetch('/api/debug/fix-all', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userId: user.id,
-          organizationName: organization.name || 'Mein Team',
-          organizationType: 'team'
+          userId: user.id
         })
       })
 
@@ -256,7 +254,7 @@ export function DashboardClient() {
 
       if (response.ok) {
         setError('')
-        setSuccess('Setup erfolgreich repariert! Lade Dashboard neu...')
+        setSuccess('Komplettes Setup erfolgreich repariert! Lade Dashboard neu...')
         // Reload dashboard data
         await loadDashboardData()
       } else {
@@ -569,17 +567,17 @@ export function DashboardClient() {
                 </Button>
               </div>
             )}
-            {error.includes('Keine Organisation gefunden') && (
-              <div className="mt-2">
-                <Button 
-                  size="sm" 
-                  onClick={fixUserSetup}
-                  className="bg-red-600 hover:bg-red-700"
-                >
-                  Setup reparieren
-                </Button>
-              </div>
-            )}
+                {error.includes('Keine Organisation gefunden') && (
+                  <div className="mt-2">
+                    <Button 
+                      size="sm" 
+                      onClick={fixUserSetup}
+                      className="bg-red-600 hover:bg-red-700"
+                    >
+                      Komplettes Setup reparieren
+                    </Button>
+                  </div>
+                )}
           </div>
         )}
 
