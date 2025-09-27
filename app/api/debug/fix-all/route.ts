@@ -12,10 +12,10 @@ export async function POST(request: NextRequest) {
     }
 
     const results = {
-      profile: null,
-      organization: null,
-      membership: null,
-      buckets: []
+      profile: null as any,
+      organization: null as any,
+      membership: null as any,
+      buckets: [] as any[]
     }
 
     // 1. Check/Create profile
@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
 
     if (existingMembership) {
       organizationId = existingMembership.organization_id
-      results.organization = existingMembership.organizations
+      results.organization = (existingMembership as any).organizations
       results.membership = existingMembership
     } else {
       // Find any organization that might belong to this user
