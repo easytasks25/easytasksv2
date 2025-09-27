@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
-import { Plus, Search, LogOut, CheckCircle, Circle, Clock, AlertTriangle } from "lucide-react"
+import { Plus, Search, LogOut, CheckCircle, Circle, Clock, AlertTriangle, Users } from "lucide-react"
 import { Prisma } from "@prisma/client"
 
 type UserSlim = {
@@ -68,6 +68,7 @@ export function DashboardClient() {
     organization: { id: '', name: '' }
   })
   const [organization, setOrganization] = useState<{ id: string; name: string }>({ id: '', name: '' })
+  const [userRole, setUserRole] = useState<string>('')
   const [searchTerm, setSearchTerm] = useState("")
   const [hideCompleted, setHideCompleted] = useState(true)
   const [isLoading, setIsLoading] = useState(false)
@@ -86,11 +87,12 @@ export function DashboardClient() {
     try {
       setIsLoading(true)
 
-      // Hole User's Organization
+      // Hole User's Organization mit Rolle
       const { data: membership } = await supabase
         .from('user_organizations')
         .select(`
           organization_id,
+          role,
           organizations (
             id,
             name
@@ -111,6 +113,7 @@ export function DashboardClient() {
         id: membership.organization_id,
         name: (membership.organizations as any).name
       })
+      setUserRole(membership.role)
 
       // Hole Buckets mit Tasks
       const { data: bucketsData } = await supabase
@@ -135,10 +138,9 @@ export function DashboardClient() {
           )
         `)
         .eq('organization_id', membership.organization_id)
-        .eq('user_id', user.id)
         .order('order_index', { ascending: true })
 
-      // Hole alle Tasks
+      // Hole alle Tasks in der Organisation
       const { data: tasksData } = await supabase
         .from('tasks')
         .select(`
@@ -158,11 +160,17 @@ export function DashboardClient() {
           )
         `)
         .eq('organization_id', membership.organization_id)
-        .eq('status', 'open')
         .order('created_at', { ascending: false })
 
       setBuckets(bucketsData || [])
       setTasks(tasksData || [])
+
+      // Wenn keine Buckets vorhanden sind, erstelle Standard-Buckets
+      if (!bucketsData || bucketsData.length === 0) {
+        console.log('No buckets found, creating default buckets...')
+        await createDefaultBuckets()
+        return // loadDashboardData wird nach createDefaultBuckets erneut aufgerufen
+      }
 
       // Berechne Stats
       const totalTasks = tasksData?.length || 0
@@ -220,7 +228,7 @@ export function DashboardClient() {
         }
       }
 
-      // Lade Buckets neu
+      // Lade Dashboard-Daten neu
       await loadDashboardData()
     } catch (error) {
       console.error("Fehler beim Erstellen der Standard-Buckets:", error)
@@ -401,7 +409,8 @@ export function DashboardClient() {
     const matchesSearch = task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          task.description?.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesStatus = hideCompleted ? task.status === 'open' : true
-    return matchesSearch && matchesStatus
+    const matchesUser = userRole === 'owner' || userRole === 'admin' || task.user_id === user?.id
+    return matchesSearch && matchesStatus && matchesUser
   })
 
   const getPriorityColor = (priority: string) => {
@@ -432,17 +441,27 @@ export function DashboardClient() {
               <h1 className="text-xl font-semibold text-gray-900">Easy Tasks</h1>
               <p className="text-sm text-gray-600">{organization.name}</p>
             </div>
-            <div className="flex items-center space-x-4">
-              <span className="text-sm text-gray-600">Hallo, {profile?.name || user?.email}</span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => signOut()}
-              >
-                <LogOut className="w-4 h-4 mr-2" />
-                Abmelden
-              </Button>
-            </div>
+                <div className="flex items-center space-x-4">
+                  <span className="text-sm text-gray-600">Hallo, {profile?.name || user?.email}</span>
+                  {(userRole === 'owner' || userRole === 'admin') && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => window.location.href = '/users'}
+                    >
+                      <Users className="w-4 h-4 mr-2" />
+                      Benutzer
+                    </Button>
+                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => signOut()}
+                  >
+                    <LogOut className="w-4 h-4 mr-2" />
+                    Abmelden
+                  </Button>
+                </div>
           </div>
         </div>
       </header>
@@ -545,10 +564,12 @@ export function DashboardClient() {
                       }`}
                     >
                       {bucket.tasks
-                        .filter(task => 
-                          task.title.toLowerCase().includes(searchTerm.toLowerCase()) &&
-                          (hideCompleted ? task.status === 'open' : true)
-                        )
+                        .filter(task => {
+                          const matchesSearch = task.title.toLowerCase().includes(searchTerm.toLowerCase())
+                          const matchesStatus = hideCompleted ? task.status === 'open' : true
+                          const matchesUser = userRole === 'owner' || userRole === 'admin' || task.user_id === user?.id
+                          return matchesSearch && matchesStatus && matchesUser
+                        })
                         .map((task, index) => (
                         <Draggable key={task.id} draggableId={task.id} index={index}>
                           {(provided, snapshot) => (
@@ -591,6 +612,11 @@ export function DashboardClient() {
                                     {task.dueDate && (
                                       <span className="text-xs text-gray-500">
                                         {new Date(task.dueDate).toLocaleDateString('de-DE')}
+                                      </span>
+                                    )}
+                                    {(userRole === 'owner' || userRole === 'admin') && task.user && (
+                                      <span className="text-xs text-gray-500">
+                                        von {task.user.name || task.user.email}
                                       </span>
                                     )}
                                   </div>

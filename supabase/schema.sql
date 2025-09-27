@@ -348,9 +348,23 @@ CREATE POLICY "Users can view invitations to their organizations" ON invitations
     )
   );
 
+CREATE POLICY "Anyone can view invitations by token" ON invitations
+  FOR SELECT USING (true);
+
 CREATE POLICY "Organization admins can create invitations" ON invitations
   FOR INSERT WITH CHECK (
     auth.uid() = invited_by AND
+    EXISTS (
+      SELECT 1 FROM user_organizations 
+      WHERE user_organizations.organization_id = invitations.organization_id 
+      AND user_organizations.user_id = auth.uid()
+      AND user_organizations.role IN ('owner', 'admin')
+      AND user_organizations.is_active = true
+    )
+  );
+
+CREATE POLICY "Organization admins can update invitations" ON invitations
+  FOR UPDATE USING (
     EXISTS (
       SELECT 1 FROM user_organizations 
       WHERE user_organizations.organization_id = invitations.organization_id 
