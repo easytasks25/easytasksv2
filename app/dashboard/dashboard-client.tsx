@@ -11,11 +11,13 @@ import { Label } from "@/components/ui/label"
 import { Plus, Search, LogOut, CheckCircle, Circle, Clock, AlertTriangle } from "lucide-react"
 import { Prisma } from "@prisma/client"
 
+type UserSlim = { id: string; name: string | null; email: string };
+
 type TaskWithRels = Prisma.TaskGetPayload<{
-  include: { 
-    user: true; 
-    bucket: true; 
-    project: true 
+  include: {
+    user: { select: { id: true; name: true; email: true } };
+    bucket: true;
+    project: true;
   };
 }>;
 
@@ -23,7 +25,7 @@ type BucketWithTasks = Prisma.BucketGetPayload<{
   include: {
     tasks: {
       include: {
-        user: true;
+        user: { select: { id: true; name: true; email: true } };
         bucket: true;
         project: true;
       };
@@ -49,11 +51,7 @@ interface DashboardClientProps {
   initialBuckets: BucketWithTasks[]
   initialTasks: TaskWithRels[]
   initialStats: DashboardStats
-  user: {
-    id: string
-    name?: string
-    email: string
-  }
+  user: UserSlim
   organization: {
     id: string
     name: string
