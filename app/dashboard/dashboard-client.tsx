@@ -99,7 +99,7 @@ export function DashboardClient() {
         .eq('is_active', true)
         .single()
 
-      if (!membership) {
+      if (!membership || !membership.organizations) {
         // Redirect to organization creation
         window.location.href = '/organizations/create'
         return
@@ -107,7 +107,7 @@ export function DashboardClient() {
 
       setOrganization({
         id: membership.organization_id,
-        name: membership.organizations.name
+        name: (membership.organizations as any).name
       })
 
       // Hole Buckets mit Tasks
@@ -179,7 +179,7 @@ export function DashboardClient() {
         daysSinceOldest: 0,
         organization: {
           id: membership.organization_id,
-          name: membership.organizations.name
+          name: (membership.organizations as any).name
         }
       })
 
