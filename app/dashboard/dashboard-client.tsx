@@ -11,7 +11,12 @@ import { Label } from "@/components/ui/label"
 import { Plus, Search, LogOut, CheckCircle, Circle, Clock, AlertTriangle } from "lucide-react"
 import { Prisma } from "@prisma/client"
 
-type UserSlim = { id: string; name: string | null; email: string };
+type UserSlim = {
+  id: string;
+  name?: string | null;
+  email?: string | null;
+  image?: string | null;
+};
 
 type TaskWithRels = Prisma.TaskGetPayload<{
   include: {
