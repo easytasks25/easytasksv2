@@ -2,6 +2,8 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import { useAuth } from "@/contexts/AuthContext"
+import { supabase } from "@/lib/supabase"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -12,6 +14,7 @@ export default function CreateOrganizationPage() {
   const [description, setDescription] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
+  const { user } = useAuth()
   const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -19,29 +22,50 @@ export default function CreateOrganizationPage() {
     setIsLoading(true)
     setError("")
 
+    if (!user) {
+      setError("Sie müssen angemeldet sein")
+      setIsLoading(false)
+      return
+    }
+
     try {
-      const response = await fetch("/api/organizations/create", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
+      // Erstelle Organisation
+      const { data: organization, error: orgError } = await supabase
+        .from('organizations')
+        .insert({
           name,
-          description,
-          type: "team",
-        }),
-      })
+          description: description || null,
+          type: 'team',
+          created_by: user.id
+        })
+        .select()
+        .single()
 
-      const data = await response.json()
+      if (orgError) {
+        console.error('Organization creation error:', orgError)
+        setError("Organisation konnte nicht erstellt werden")
+        return
+      }
 
-      if (!response.ok) {
-        setError(data.error || "Organisation konnte nicht erstellt werden")
+      // Füge User als Owner zur Organisation hinzu
+      const { error: membershipError } = await supabase
+        .from('user_organizations')
+        .insert({
+          user_id: user.id,
+          organization_id: organization.id,
+          role: 'owner',
+          is_active: true
+        })
+
+      if (membershipError) {
+        console.error('Membership creation error:', membershipError)
+        setError("Fehler beim Hinzufügen zur Organisation")
         return
       }
 
       router.push("/dashboard")
-      router.refresh()
     } catch (error) {
+      console.error('Create organization error:', error)
       setError("Ein Fehler ist aufgetreten")
     } finally {
       setIsLoading(false)
