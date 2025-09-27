@@ -97,75 +97,130 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Create profile and default organization after successful signup
       if (data.user) {
-        // Use admin client to bypass RLS for profile creation
-        const { error: profileError } = await supabaseAdmin
+        // Check if profile already exists (created by trigger)
+        const { data: existingProfile, error: profileCheckError } = await supabaseAdmin
           .from('profiles')
-          .insert({
-            id: data.user.id,
-            email: data.user.email!,
-            name: name || null,
-          })
-
-        if (profileError) {
-          console.error('Error creating profile:', profileError)
-          return { error: { message: profileError.message } as AuthError }
-        }
-
-        // Use admin client to bypass RLS for organization creation
-        const { data: organization, error: orgError } = await supabaseAdmin
-          .from('organizations')
-          .insert({
-            name: organizationName || (name ? `${name}'s Team` : 'Mein Team'),
-            description: organizationType === 'company' ? 'Unternehmen' : 'Team',
-            type: organizationType || 'team',
-            created_by: data.user.id
-          })
-          .select()
+          .select('id')
+          .eq('id', data.user.id)
           .single()
 
-        if (orgError) {
-          console.error('Error creating organization:', orgError)
-          return { error: { message: orgError.message } as AuthError }
+        if (profileCheckError && profileCheckError.code !== 'PGRST116') {
+          console.error('Error checking profile:', profileCheckError)
+          return { error: { message: profileCheckError.message } as AuthError }
         }
 
-        // Use admin client to bypass RLS for membership creation
-        const { error: membershipError } = await supabaseAdmin
-          .from('user_organizations')
-          .insert({
-            user_id: data.user.id,
-            organization_id: organization.id,
-            role: 'owner',
-            is_active: true
-          })
-
-        if (membershipError) {
-          console.error('Error creating membership:', membershipError)
-          return { error: { message: membershipError.message } as AuthError }
-        }
-
-        // Create default buckets for the new user
-        const defaultBuckets = [
-          { name: "Heute", type: "day", color: "#fef3c7", order_index: 1 },
-          { name: "Morgen", type: "day", color: "#dbeafe", order_index: 2 },
-          { name: "Backlog", type: "custom", color: "#e5efe9", order_index: 3 }
-        ]
-
-        for (const bucket of defaultBuckets) {
-          const { error: bucketError } = await supabaseAdmin
-            .from('buckets')
+        // Only create profile if it doesn't exist
+        if (!existingProfile) {
+          const { error: profileError } = await supabaseAdmin
+            .from('profiles')
             .insert({
-              name: bucket.name,
-              type: bucket.type,
-              color: bucket.color,
-              order_index: bucket.order_index,
-              user_id: data.user.id,
-              organization_id: organization.id,
-              project_id: null
+              id: data.user.id,
+              email: data.user.email!,
+              name: name || null,
             })
 
-          if (bucketError) {
-            console.error('Error creating default bucket:', bucketError)
-            // Don't fail the entire signup for bucket creation errors
+          if (profileError) {
+            console.error('Error creating profile:', profileError)
+            return { error: { message: profileError.message } as AuthError }
+          }
+        } else {
+          // Update existing profile with name if provided
+          if (name) {
+            const { error: updateError } = await supabaseAdmin
+              .from('profiles')
+              .update({ name })
+              .eq('id', data.user.id)
+
+            if (updateError) {
+              console.error('Error updating profile:', updateError)
+              // Don't fail the signup for this
+            }
+          }
+        }
+
+        // Check if user already has an organization
+        const { data: existingMembership, error: membershipCheckError } = await supabaseAdmin
+          .from('user_organizations')
+          .select('organization_id')
+          .eq('user_id', data.user.id)
+          .eq('is_active', true)
+          .single()
+
+        let organizationId = null
+
+        if (existingMembership) {
+          // User already has an organization
+          organizationId = existingMembership.organization_id
+          console.log('User already has organization:', organizationId)
+        } else {
+          // Create new organization
+          const { data: organization, error: orgError } = await supabaseAdmin
+            .from('organizations')
+            .insert({
+              name: organizationName || (name ? `${name}'s Team` : 'Mein Team'),
+              description: organizationType === 'company' ? 'Unternehmen' : 'Team',
+              type: organizationType || 'team',
+              created_by: data.user.id
+            })
+            .select()
+            .single()
+
+          if (orgError) {
+            console.error('Error creating organization:', orgError)
+            return { error: { message: orgError.message } as AuthError }
+          }
+
+          organizationId = organization.id
+
+          // Create membership
+          const { error: membershipError } = await supabaseAdmin
+            .from('user_organizations')
+            .insert({
+              user_id: data.user.id,
+              organization_id: organization.id,
+              role: 'owner',
+              is_active: true
+            })
+
+          if (membershipError) {
+            console.error('Error creating membership:', membershipError)
+            return { error: { message: membershipError.message } as AuthError }
+          }
+        }
+
+        // Create default buckets for the new user (only if they don't exist)
+        if (organizationId) {
+          const { data: existingBuckets, error: bucketCheckError } = await supabaseAdmin
+            .from('buckets')
+            .select('id')
+            .eq('user_id', data.user.id)
+            .eq('organization_id', organizationId)
+
+          if (!existingBuckets || existingBuckets.length === 0) {
+            const defaultBuckets = [
+              { name: "Heute", type: "day", color: "#fef3c7", order_index: 1 },
+              { name: "Morgen", type: "day", color: "#dbeafe", order_index: 2 },
+              { name: "Backlog", type: "custom", color: "#e5efe9", order_index: 3 }
+            ]
+
+            for (const bucket of defaultBuckets) {
+              const { error: bucketError } = await supabaseAdmin
+                .from('buckets')
+                .insert({
+                  name: bucket.name,
+                  type: bucket.type,
+                  color: bucket.color,
+                  order_index: bucket.order_index,
+                  user_id: data.user.id,
+                  organization_id: organizationId,
+                  project_id: null
+                })
+
+              if (bucketError) {
+                console.error('Error creating default bucket:', bucketError)
+                // Don't fail the entire signup for bucket creation errors
+              }
+            }
           }
         }
       }
