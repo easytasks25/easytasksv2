@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState } from 'react'
 import { User, Session, AuthError } from '@supabase/supabase-js'
-import { supabase } from '@/lib/supabase'
+import { supabase, supabaseAdmin } from '@/lib/supabase'
 import { Database } from '@/types/supabase'
 
 type Profile = Database['public']['Tables']['profiles']['Row']
@@ -97,8 +97,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Create profile and default organization after successful signup
       if (data.user) {
-        // Create profile first
-        const { error: profileError } = await supabase
+        // Use admin client to bypass RLS for profile creation
+        const { error: profileError } = await supabaseAdmin
           .from('profiles')
           .insert({
             id: data.user.id,
@@ -111,8 +111,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return { error: { message: profileError.message } as AuthError }
         }
 
-        // Create organization with user-provided details
-        const { data: organization, error: orgError } = await supabase
+        // Use admin client to bypass RLS for organization creation
+        const { data: organization, error: orgError } = await supabaseAdmin
           .from('organizations')
           .insert({
             name: organizationName || (name ? `${name}'s Team` : 'Mein Team'),
@@ -128,8 +128,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return { error: { message: orgError.message } as AuthError }
         }
 
-        // Add user as owner to the organization
-        const { error: membershipError } = await supabase
+        // Use admin client to bypass RLS for membership creation
+        const { error: membershipError } = await supabaseAdmin
           .from('user_organizations')
           .insert({
             user_id: data.user.id,
