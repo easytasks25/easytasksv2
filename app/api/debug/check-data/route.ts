@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 
+const errMsg = (e: unknown) =>
+  e instanceof Error ? e.message : e ? String(e) : undefined
+
 export async function POST(request: NextRequest) {
   try {
     const { userId } = await request.json()
@@ -11,61 +14,94 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
-    // Check user's organization membership
-    const { data: membership, error: membershipError } = await supabaseAdmin
-      .from('user_organizations')
-      .select(`
-        organization_id,
-        role,
-        is_active,
-        organizations (
-          id,
-          name
-        )
-      `)
-      .eq('user_id', userId)
-      .eq('is_active', true)
-      .single()
+    let membershipError: unknown = null
+    let bucketsError: unknown = null
+    let tasksError: unknown = null
 
-    if (membershipError) {
-      return NextResponse.json({ 
-        error: 'No active organization membership found',
-        details: membershipError.message
-      }, { status: 404 })
+    let membership = null
+    let buckets = null
+    let tasks = null
+
+    // Check user's organization membership
+    try {
+      const { data, error } = await supabaseAdmin
+        .from('user_organizations')
+        .select(`
+          organization_id,
+          role,
+          is_active,
+          organizations (
+            id,
+            name
+          )
+        `)
+        .eq('user_id', userId)
+        .eq('is_active', true)
+        .single()
+
+      if (error) {
+        membershipError = error
+      } else {
+        membership = data
+      }
+    } catch (e) {
+      membershipError = e
     }
 
-    // Check buckets in the organization
-    const { data: buckets, error: bucketsError } = await supabaseAdmin
-      .from('buckets')
-      .select('*')
-      .eq('organization_id', membership.organization_id)
+    if (membership) {
+      // Check buckets in the organization
+      try {
+        const { data, error } = await supabaseAdmin
+          .from('buckets')
+          .select('*')
+          .eq('organization_id', membership.organization_id)
 
-    // Check tasks in the organization
-    const { data: tasks, error: tasksError } = await supabaseAdmin
-      .from('tasks')
-      .select('*')
-      .eq('organization_id', membership.organization_id)
+        if (error) {
+          bucketsError = error
+        } else {
+          buckets = data
+        }
+      } catch (e) {
+        bucketsError = e
+      }
+
+      // Check tasks in the organization
+      try {
+        const { data, error } = await supabaseAdmin
+          .from('tasks')
+          .select('*')
+          .eq('organization_id', membership.organization_id)
+
+        if (error) {
+          tasksError = error
+        } else {
+          tasks = data
+        }
+      } catch (e) {
+        tasksError = e
+      }
+    }
 
     return NextResponse.json({
       user: {
         id: userId
       },
-      organization: {
+      organization: membership ? {
         id: membership.organization_id,
         name: (membership.organizations as any).name
-      },
-      membership: {
+      } : null,
+      membership: membership ? {
         role: membership.role,
         is_active: membership.is_active
-      },
+      } : null,
       buckets: buckets || [],
-      bucketsCount: buckets?.length || 0,
+      bucketsCount: Array.isArray(buckets) ? buckets.length : 0,
       tasks: tasks || [],
-      tasksCount: tasks?.length || 0,
+      tasksCount: Array.isArray(tasks) ? tasks.length : 0,
       errors: {
-        membership: membershipError?.message,
-        buckets: bucketsError?.message,
-        tasks: tasksError?.message
+        membership: errMsg(membershipError),
+        buckets: errMsg(bucketsError),
+        tasks: errMsg(tasksError)
       }
     })
 
