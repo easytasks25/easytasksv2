@@ -31,6 +31,9 @@ model User {
   notes       Note[]
   createdOrgs Organization[] @relation("OrganizationCreatedBy")
   invitations Invitation[]
+
+  // ⬇️ NEU: Gegenrelation zu ProjectUser
+  projectUsers ProjectUser[]
 }
 
 model Organization {
