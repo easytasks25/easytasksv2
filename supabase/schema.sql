@@ -265,7 +265,6 @@ CREATE POLICY "Users can view buckets in their organizations" ON buckets
 
 CREATE POLICY "Users can create buckets in their organizations" ON buckets
   FOR INSERT WITH CHECK (
-    auth.uid() = user_id AND
     EXISTS (
       SELECT 1 FROM user_organizations 
       WHERE user_organizations.organization_id = buckets.organization_id 
@@ -274,11 +273,25 @@ CREATE POLICY "Users can create buckets in their organizations" ON buckets
     )
   );
 
-CREATE POLICY "Users can update their own buckets" ON buckets
-  FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Organization members can update buckets" ON buckets
+  FOR UPDATE USING (
+    EXISTS (
+      SELECT 1 FROM user_organizations 
+      WHERE user_organizations.organization_id = buckets.organization_id 
+      AND user_organizations.user_id = auth.uid()
+      AND user_organizations.is_active = true
+    )
+  );
 
-CREATE POLICY "Users can delete their own buckets" ON buckets
-  FOR DELETE USING (auth.uid() = user_id);
+CREATE POLICY "Organization members can delete buckets" ON buckets
+  FOR DELETE USING (
+    EXISTS (
+      SELECT 1 FROM user_organizations 
+      WHERE user_organizations.organization_id = buckets.organization_id 
+      AND user_organizations.user_id = auth.uid()
+      AND user_organizations.is_active = true
+    )
+  );
 
 -- RLS Policies for tasks
 CREATE POLICY "Users can view tasks in their organizations" ON tasks
