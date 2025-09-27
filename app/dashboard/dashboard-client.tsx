@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react"
 import { DragDropContext, Droppable, Draggable, DropResult } from "react-beautiful-dnd"
-import { signOut } from "next-auth/react"
+import { useAuth } from "@/contexts/AuthContext"
+import { supabase } from "@/lib/supabase"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -52,37 +53,142 @@ interface DashboardStats {
   }
 }
 
-interface DashboardClientProps {
-  initialBuckets: BucketWithTasks[]
-  initialTasks: TaskWithRels[]
-  initialStats: DashboardStats
-  user: UserSlim
-  organization: {
-    id: string
-    name: string
-  }
-}
-
-export function DashboardClient({ 
-  initialBuckets, 
-  initialTasks, 
-  initialStats, 
-  user, 
-  organization 
-}: DashboardClientProps) {
-  const [buckets, setBuckets] = useState<BucketWithTasks[]>(initialBuckets)
-  const [tasks, setTasks] = useState<TaskWithRels[]>(initialTasks)
-  const [stats, setStats] = useState<DashboardStats>(initialStats)
+export function DashboardClient() {
+  const { user, profile, signOut } = useAuth()
+  const [buckets, setBuckets] = useState<BucketWithTasks[]>([])
+  const [tasks, setTasks] = useState<TaskWithRels[]>([])
+  const [stats, setStats] = useState<DashboardStats>({
+    totalTasks: 0,
+    openTasks: 0,
+    completedTasks: 0,
+    todayTasks: 0,
+    overdueTasks: 0,
+    completedThisWeek: 0,
+    daysSinceOldest: 0,
+    organization: { id: '', name: '' }
+  })
+  const [organization, setOrganization] = useState<{ id: string; name: string }>({ id: '', name: '' })
   const [searchTerm, setSearchTerm] = useState("")
   const [hideCompleted, setHideCompleted] = useState(true)
   const [isLoading, setIsLoading] = useState(false)
 
-  // Erstelle Standard-Buckets falls keine vorhanden
+  // Lade Dashboard-Daten
   useEffect(() => {
-    if (buckets.length === 0) {
-      createDefaultBuckets()
+    if (user) {
+      loadDashboardData()
     }
-  }, [])
+  }, [user])
+
+  const loadDashboardData = async () => {
+    if (!user) return
+
+    try {
+      setIsLoading(true)
+
+      // Hole User's Organization
+      const { data: membership } = await supabase
+        .from('user_organizations')
+        .select(`
+          organization_id,
+          organizations (
+            id,
+            name
+          )
+        `)
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .single()
+
+      if (!membership) {
+        // Redirect to organization creation
+        window.location.href = '/organizations/create'
+        return
+      }
+
+      setOrganization({
+        id: membership.organization_id,
+        name: membership.organizations.name
+      })
+
+      // Hole Buckets mit Tasks
+      const { data: bucketsData } = await supabase
+        .from('buckets')
+        .select(`
+          *,
+          tasks (
+            *,
+            user:profiles (
+              id,
+              name,
+              email
+            ),
+            bucket:buckets (
+              id,
+              name
+            ),
+            project:projects (
+              id,
+              name
+            )
+          )
+        `)
+        .eq('organization_id', membership.organization_id)
+        .eq('user_id', user.id)
+        .order('order_index', { ascending: true })
+
+      // Hole alle Tasks
+      const { data: tasksData } = await supabase
+        .from('tasks')
+        .select(`
+          *,
+          user:profiles (
+            id,
+            name,
+            email
+          ),
+          bucket:buckets (
+            id,
+            name
+          ),
+          project:projects (
+            id,
+            name
+          )
+        `)
+        .eq('organization_id', membership.organization_id)
+        .eq('status', 'open')
+        .order('created_at', { ascending: false })
+
+      setBuckets(bucketsData || [])
+      setTasks(tasksData || [])
+
+      // Berechne Stats
+      const totalTasks = tasksData?.length || 0
+      const openTasks = tasksData?.filter(t => t.status === 'open').length || 0
+      const completedTasks = 0 // TODO: Implement completed tasks query
+      const todayTasks = 0 // TODO: Implement today's tasks query
+      const overdueTasks = 0 // TODO: Implement overdue tasks query
+
+      setStats({
+        totalTasks,
+        openTasks,
+        completedTasks,
+        todayTasks,
+        overdueTasks,
+        completedThisWeek: 0,
+        daysSinceOldest: 0,
+        organization: {
+          id: membership.organization_id,
+          name: membership.organizations.name
+        }
+      })
+
+    } catch (error) {
+      console.error('Error loading dashboard data:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   const createDefaultBuckets = async () => {
     try {
@@ -282,11 +388,11 @@ export function DashboardClient({
               <p className="text-sm text-gray-600">{organization.name}</p>
             </div>
             <div className="flex items-center space-x-4">
-              <span className="text-sm text-gray-600">Hallo, {user.name || user.email}</span>
+              <span className="text-sm text-gray-600">Hallo, {profile?.name || user?.email}</span>
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => signOut({ callbackUrl: "/auth/signin" })}
+                onClick={() => signOut()}
               >
                 <LogOut className="w-4 h-4 mr-2" />
                 Abmelden

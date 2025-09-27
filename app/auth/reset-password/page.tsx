@@ -1,24 +1,32 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { useAuth } from '@/contexts/AuthContext'
+import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
-export default function SignUpPage() {
-  const [name, setName] = useState('')
-  const [email, setEmail] = useState('')
+export default function ResetPasswordPage() {
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
-  const { signUp } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
+
+  useEffect(() => {
+    // Check if we have the necessary tokens in the URL
+    const accessToken = searchParams.get('access_token')
+    const refreshToken = searchParams.get('refresh_token')
+    
+    if (!accessToken || !refreshToken) {
+      setError('Ungültiger oder fehlender Reset-Link')
+    }
+  }, [searchParams])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -37,12 +45,21 @@ export default function SignUpPage() {
       return
     }
 
-    const { error } = await signUp(email, password, name)
-    
-    if (error) {
-      setError(error.message)
-    } else {
-      setSuccess(true)
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: password
+      })
+
+      if (error) {
+        setError(error.message)
+      } else {
+        setSuccess(true)
+        setTimeout(() => {
+          router.push('/dashboard')
+        }, 2000)
+      }
+    } catch (error) {
+      setError('Ein Fehler ist aufgetreten')
     }
     
     setLoading(false)
@@ -54,18 +71,17 @@ export default function SignUpPage() {
         <div className="max-w-md w-full space-y-8">
           <Card>
             <CardHeader>
-              <CardTitle>Registrierung erfolgreich!</CardTitle>
+              <CardTitle>Passwort erfolgreich geändert!</CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-center text-gray-600 mb-4">
-                Bitte überprüfen Sie Ihre E-Mail und klicken Sie auf den Bestätigungslink.
+                Ihr Passwort wurde erfolgreich geändert. Sie werden automatisch weitergeleitet...
               </p>
-              <Button
-                onClick={() => router.push('/auth/signin')}
-                className="w-full"
-              >
-                Zur Anmeldung
-              </Button>
+              <Link href="/dashboard">
+                <Button className="w-full">
+                  Zum Dashboard
+                </Button>
+              </Link>
             </CardContent>
           </Card>
         </div>
@@ -78,22 +94,16 @@ export default function SignUpPage() {
       <div className="max-w-md w-full space-y-8">
         <div>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Easy Tasks Konto erstellen
+            Neues Passwort festlegen
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
-            Oder{' '}
-            <Link
-              href="/auth/signin"
-              className="font-medium text-primary hover:text-primary/80"
-            >
-              bei bestehendem Konto anmelden
-            </Link>
+            Geben Sie Ihr neues Passwort ein.
           </p>
         </div>
         
         <Card>
           <CardHeader>
-            <CardTitle>Registrieren</CardTitle>
+            <CardTitle>Passwort zurücksetzen</CardTitle>
           </CardHeader>
           <CardContent>
             <form className="space-y-6" onSubmit={handleSubmit}>
@@ -104,34 +114,7 @@ export default function SignUpPage() {
               )}
               
               <div>
-                <Label htmlFor="name">Name (optional)</Label>
-                <Input
-                  id="name"
-                  name="name"
-                  type="text"
-                  autoComplete="name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="mt-1"
-                />
-              </div>
-              
-              <div>
-                <Label htmlFor="email">E-Mail-Adresse</Label>
-                <Input
-                  id="email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="mt-1"
-                />
-              </div>
-              
-              <div>
-                <Label htmlFor="password">Passwort</Label>
+                <Label htmlFor="password">Neues Passwort</Label>
                 <Input
                   id="password"
                   name="password"
@@ -166,8 +149,17 @@ export default function SignUpPage() {
                 className="w-full"
                 disabled={loading}
               >
-                {loading ? 'Wird erstellt...' : 'Konto erstellen'}
+                {loading ? 'Wird gespeichert...' : 'Passwort ändern'}
               </Button>
+              
+              <div className="text-center">
+                <Link
+                  href="/auth/signin"
+                  className="text-sm text-primary hover:text-primary/80"
+                >
+                  Zur Anmeldung
+                </Link>
+              </div>
             </form>
           </CardContent>
         </Card>

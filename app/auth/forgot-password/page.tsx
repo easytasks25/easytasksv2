@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
@@ -9,28 +8,60 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
-export default function SignInPage() {
+export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const { signIn } = useAuth()
-  const router = useRouter()
+  const [success, setSuccess] = useState(false)
+  const { resetPassword } = useAuth()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError('')
 
-    const { error } = await signIn(email, password)
+    const { error } = await resetPassword(email)
     
     if (error) {
       setError(error.message)
     } else {
-      router.push('/dashboard')
+      setSuccess(true)
     }
     
     setLoading(false)
+  }
+
+  if (success) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-md w-full space-y-8">
+          <Card>
+            <CardHeader>
+              <CardTitle>E-Mail gesendet!</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-center text-gray-600 mb-4">
+                Falls ein Konto mit dieser E-Mail-Adresse existiert, haben wir Ihnen einen Link zum Zurücksetzen des Passworts gesendet.
+              </p>
+              <div className="space-y-2">
+                <Link href="/auth/signin">
+                  <Button className="w-full">
+                    Zur Anmeldung
+                  </Button>
+                </Link>
+                <Button
+                  variant="outline"
+                  onClick={() => setSuccess(false)}
+                  className="w-full"
+                >
+                  Erneut versuchen
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -38,22 +69,16 @@ export default function SignInPage() {
       <div className="max-w-md w-full space-y-8">
         <div>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Bei Easy Tasks anmelden
+            Passwort zurücksetzen
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
-            Oder{' '}
-            <Link
-              href="/auth/signup"
-              className="font-medium text-primary hover:text-primary/80"
-            >
-              neues Konto erstellen
-            </Link>
+            Geben Sie Ihre E-Mail-Adresse ein und wir senden Ihnen einen Link zum Zurücksetzen des Passworts.
           </p>
         </div>
         
         <Card>
           <CardHeader>
-            <CardTitle>Anmelden</CardTitle>
+            <CardTitle>Passwort zurücksetzen</CardTitle>
           </CardHeader>
           <CardContent>
             <form className="space-y-6" onSubmit={handleSubmit}>
@@ -77,36 +102,22 @@ export default function SignInPage() {
                 />
               </div>
               
-              <div>
-                <Label htmlFor="password">Passwort</Label>
-                <Input
-                  id="password"
-                  name="password"
-                  type="password"
-                  autoComplete="current-password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="mt-1"
-                />
-              </div>
-              
-              <div className="flex items-center justify-between">
-                <Link
-                  href="/auth/forgot-password"
-                  className="text-sm text-primary hover:text-primary/80"
-                >
-                  Passwort vergessen?
-                </Link>
-              </div>
-              
               <Button
                 type="submit"
                 className="w-full"
                 disabled={loading}
               >
-                {loading ? 'Wird angemeldet...' : 'Anmelden'}
+                {loading ? 'Wird gesendet...' : 'Link senden'}
               </Button>
+              
+              <div className="text-center">
+                <Link
+                  href="/auth/signin"
+                  className="text-sm text-primary hover:text-primary/80"
+                >
+                  Zurück zur Anmeldung
+                </Link>
+              </div>
             </form>
           </CardContent>
         </Card>
