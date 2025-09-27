@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       userId,
-      authUser: authUser ? {
+      authUser: authUser?.user ? {
         id: authUser.user.id,
         email: authUser.user.email,
         created_at: authUser.user.created_at
