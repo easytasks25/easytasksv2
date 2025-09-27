@@ -102,6 +102,7 @@ export function DashboardClient() {
   const [hideCompleted, setHideCompleted] = useState(true)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
+  const [success, setSuccess] = useState("")
 
   // Lade Dashboard-Daten
   useEffect(() => {
@@ -133,8 +134,8 @@ export function DashboardClient() {
 
       if (!membership || !membership.organizations) {
         // This should not happen anymore since we create default organization on signup
-        console.error('No organization found for user')
-        setError('Keine Organisation gefunden. Bitte melden Sie sich ab und erneut an.')
+        console.error('No organization found for user:', user.id)
+        setError('Keine Organisation gefunden. Das Setup wurde möglicherweise nicht abgeschlossen.')
         return
       }
 
@@ -232,6 +233,38 @@ export function DashboardClient() {
       console.error('Error loading dashboard data:', error)
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const fixUserSetup = async () => {
+    if (!user) return
+
+    try {
+      setError('Repariere Benutzer-Setup...')
+      
+      const response = await fetch('/api/debug/fix-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          organizationName: organization.name || 'Mein Team',
+          organizationType: 'team'
+        })
+      })
+
+      const result = await response.json()
+
+      if (response.ok) {
+        setError('')
+        setSuccess('Setup erfolgreich repariert! Lade Dashboard neu...')
+        // Reload dashboard data
+        await loadDashboardData()
+      } else {
+        setError(`Fehler beim Reparieren: ${result.error}`)
+      }
+    } catch (error) {
+      console.error('Error fixing user setup:', error)
+      setError('Fehler beim Reparieren des Setups.')
     }
   }
 
@@ -536,6 +569,24 @@ export function DashboardClient() {
                 </Button>
               </div>
             )}
+            {error.includes('Keine Organisation gefunden') && (
+              <div className="mt-2">
+                <Button 
+                  size="sm" 
+                  onClick={fixUserSetup}
+                  className="bg-red-600 hover:bg-red-700"
+                >
+                  Setup reparieren
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Success Display */}
+        {success && (
+          <div className="bg-green-50 border border-green-200 text-green-600 px-4 py-3 rounded-md mb-6">
+            {success}
           </div>
         )}
 
