@@ -200,13 +200,12 @@ export function DashboardClient() {
       setBuckets(bucketsData || [])
       setTasks(tasksData || [])
 
-      // Wenn keine Buckets vorhanden sind, erstelle Standard-Buckets
-      if (!bucketsData || bucketsData.length === 0) {
-        console.log('No buckets found, creating default buckets...')
-        setError('Keine Buckets gefunden. Erstelle Standard-Buckets...')
-        await createDefaultBuckets()
-        return // loadDashboardData wird nach createDefaultBuckets erneut aufgerufen
-      }
+          // Wenn keine Buckets vorhanden sind, zeige Fehler
+          if (!bucketsData || bucketsData.length === 0) {
+            console.log('No buckets found for organization:', membership.organization_id)
+            setError('Keine Buckets gefunden. Bitte kontaktieren Sie den Administrator.')
+            return
+          }
 
       // Berechne Stats
       const totalTasks = tasksData?.length || 0
@@ -236,89 +235,7 @@ export function DashboardClient() {
     }
   }
 
-  const fixUserSetup = async () => {
-    if (!user) return
 
-    try {
-      setError('Repariere komplettes Benutzer-Setup...')
-      
-      const response = await fetch('/api/debug/fix-all', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: user.id
-        })
-      })
-
-      const result = await response.json()
-
-      if (response.ok) {
-        setError('')
-        setSuccess('Komplettes Setup erfolgreich repariert! Lade Dashboard neu...')
-        // Reload dashboard data
-        await loadDashboardData()
-      } else {
-        setError(`Fehler beim Reparieren: ${result.error}`)
-      }
-    } catch (error) {
-      console.error('Error fixing user setup:', error)
-      setError('Fehler beim Reparieren des Setups.')
-    }
-  }
-
-  const createDefaultBuckets = async () => {
-    if (!user || !organization.id) {
-      console.error('Cannot create buckets: missing user or organization')
-      return
-    }
-
-    try {
-      console.log('Creating default buckets for user:', user.id, 'org:', organization.id)
-      
-      const defaultBuckets = [
-        { name: "Heute", type: "day", color: "#fef3c7", order_index: 1 },
-        { name: "Morgen", type: "day", color: "#dbeafe", order_index: 2 },
-        { name: "Backlog", type: "custom", color: "#e5efe9", order_index: 3 }
-      ]
-
-      let createdCount = 0
-      for (const bucket of defaultBuckets) {
-        const { data, error } = await supabase
-          .from('buckets')
-          .insert({
-            name: bucket.name,
-            type: bucket.type,
-            color: bucket.color,
-            order_index: bucket.order_index,
-            user_id: user.id,
-            organization_id: organization.id,
-            project_id: null
-          })
-          .select()
-
-        if (error) {
-          console.error("Fehler beim Erstellen des Buckets:", bucket.name, error)
-          setError(`Fehler beim Erstellen des Buckets "${bucket.name}": ${error.message}`)
-        } else {
-          console.log('Bucket created successfully:', bucket.name)
-          createdCount++
-        }
-      }
-
-      console.log(`Created ${createdCount} out of ${defaultBuckets.length} buckets`)
-      
-      if (createdCount > 0) {
-        setError('') // Clear error if at least one bucket was created
-        // Lade Dashboard-Daten neu
-        await loadDashboardData()
-      } else {
-        setError('Fehler beim Erstellen der Standard-Buckets. Bitte versuchen Sie es erneut.')
-      }
-    } catch (error) {
-      console.error("Fehler beim Erstellen der Standard-Buckets:", error)
-      setError('Fehler beim Erstellen der Standard-Buckets.')
-    }
-  }
 
   const handleDragEnd = async (result: DropResult) => {
     if (!result.destination) return
@@ -552,34 +469,12 @@ export function DashboardClient() {
       </header>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Error Display */}
-        {error && (
-          <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md mb-6">
-            {error}
-            {error.includes('Keine Buckets gefunden') && (
-              <div className="mt-2">
-                <Button 
-                  size="sm" 
-                  onClick={createDefaultBuckets}
-                  className="bg-red-600 hover:bg-red-700"
-                >
-                  Standard-Buckets erstellen
-                </Button>
+            {/* Error Display */}
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md mb-6">
+                {error}
               </div>
             )}
-                {error.includes('Keine Organisation gefunden') && (
-                  <div className="mt-2">
-                    <Button 
-                      size="sm" 
-                      onClick={fixUserSetup}
-                      className="bg-red-600 hover:bg-red-700"
-                    >
-                      Komplettes Setup reparieren
-                    </Button>
-                  </div>
-                )}
-          </div>
-        )}
 
         {/* Success Display */}
         {success && (
