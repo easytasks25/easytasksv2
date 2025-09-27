@@ -12,7 +12,7 @@ interface AuthContextType {
   profile: Profile | null
   session: Session | null
   loading: boolean
-  signUp: (email: string, password: string, name?: string) => Promise<{ error: AuthError | null }>
+  signUp: (email: string, password: string, name?: string, organizationName?: string, organizationType?: 'company' | 'team') => Promise<{ error: AuthError | null }>
   signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>
   signOut: () => Promise<{ error: AuthError | null }>
   resetPassword: (email: string) => Promise<{ error: AuthError | null }>
@@ -79,7 +79,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const signUp = async (email: string, password: string, name?: string) => {
+  const signUp = async (email: string, password: string, name?: string, organizationName?: string, organizationType?: 'company' | 'team') => {
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -108,16 +108,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (profileError) {
           console.error('Error creating profile:', profileError)
-          return { error: profileError as AuthError }
+          return { error: { message: profileError.message } as AuthError }
         }
 
-        // Create default organization
+        // Create organization with user-provided details
         const { data: organization, error: orgError } = await supabase
           .from('organizations')
           .insert({
-            name: name ? `${name}'s Team` : 'Mein Team',
-            description: 'Standard-Organisation',
-            type: 'team',
+            name: organizationName || (name ? `${name}'s Team` : 'Mein Team'),
+            description: organizationType === 'company' ? 'Unternehmen' : 'Team',
+            type: organizationType || 'team',
             created_by: data.user.id
           })
           .select()
@@ -125,7 +125,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (orgError) {
           console.error('Error creating organization:', orgError)
-          return { error: orgError as AuthError }
+          return { error: { message: orgError.message } as AuthError }
         }
 
         // Add user as owner to the organization
@@ -140,7 +140,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (membershipError) {
           console.error('Error creating membership:', membershipError)
-          return { error: membershipError as AuthError }
+          return { error: { message: membershipError.message } as AuthError }
         }
       }
 

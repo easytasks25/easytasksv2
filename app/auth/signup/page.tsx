@@ -14,6 +14,8 @@ export default function SignUpPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [organizationName, setOrganizationName] = useState('')
+  const [organizationType, setOrganizationType] = useState<'company' | 'team'>('team')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
@@ -37,7 +39,7 @@ export default function SignUpPage() {
       return
     }
 
-    const { error } = await signUp(email, password, name)
+    const { error } = await signUp(email, password, name, organizationName, organizationType)
     
     if (error) {
       setError(error.message)
@@ -158,6 +160,35 @@ export default function SignUpPage() {
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   className="mt-1"
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="organizationType">Art der Organisation</Label>
+                <select
+                  id="organizationType"
+                  value={organizationType}
+                  onChange={(e) => setOrganizationType(e.target.value as 'company' | 'team')}
+                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
+                >
+                  <option value="team">Team (Privat)</option>
+                  <option value="company">Unternehmen</option>
+                </select>
+              </div>
+              
+              <div>
+                <Label htmlFor="organizationName">
+                  {organizationType === 'company' ? 'Firmenname' : 'Team-Name'}
+                </Label>
+                <Input
+                  id="organizationName"
+                  name="organizationName"
+                  type="text"
+                  required
+                  value={organizationName}
+                  onChange={(e) => setOrganizationName(e.target.value)}
+                  className="mt-1"
+                  placeholder={organizationType === 'company' ? 'Meine Firma GmbH' : 'Mein Team'}
                 />
               </div>
               
