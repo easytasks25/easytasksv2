@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { DragDropContext, Droppable, Draggable, DropResult } from "react-beautiful-dnd"
 import { useAuth } from "@/contexts/AuthContext"
 import { supabase } from "@/lib/supabase"
@@ -81,39 +81,160 @@ interface DashboardStats {
   }
 }
 
-interface DashboardClientProps {
-  initialBuckets: BucketWithTasks[]
-  initialTasks: TaskWithRels[]
-  user: UserSlim
-  organization: { id: string; name: string }
-  userRole: string
-}
-
-export function DashboardClient({ 
-  initialBuckets, 
-  initialTasks, 
-  user, 
-  organization, 
-  userRole 
-}: DashboardClientProps) {
-  const { profile, signOut } = useAuth()
-  const [buckets, setBuckets] = useState<BucketWithTasks[]>(initialBuckets)
-  const [tasks, setTasks] = useState<TaskWithRels[]>(initialTasks)
+export function DashboardClient() {
+  const { user, profile, signOut } = useAuth()
+  const [buckets, setBuckets] = useState<BucketWithTasks[]>([])
+  const [tasks, setTasks] = useState<TaskWithRels[]>([])
   const [stats, setStats] = useState<DashboardStats>({
-    totalTasks: initialTasks.length,
-    openTasks: initialTasks.filter(t => t.status === 'open').length,
-    completedTasks: initialTasks.filter(t => t.status === 'done').length,
+    totalTasks: 0,
+    openTasks: 0,
+    completedTasks: 0,
     todayTasks: 0,
     overdueTasks: 0,
     completedThisWeek: 0,
     daysSinceOldest: 0,
-    organization: organization
+    organization: { id: '', name: '' }
   })
+  const [organization, setOrganization] = useState<{ id: string; name: string }>({ id: '', name: '' })
+  const [userRole, setUserRole] = useState<string>('')
   const [searchTerm, setSearchTerm] = useState("")
   const [hideCompleted, setHideCompleted] = useState(true)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
+
+  // Lade Dashboard-Daten
+  useEffect(() => {
+    if (user) {
+      loadDashboardData()
+    }
+  }, [user])
+
+  const loadDashboardData = async () => {
+    if (!user) return
+
+    try {
+      setIsLoading(true)
+
+      // Hole User's Organization mit Rolle
+      const { data: membership } = await supabase
+        .from('user_organizations')
+        .select(`
+          organization_id,
+          role,
+          organizations (
+            id,
+            name
+          )
+        `)
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .single()
+
+      if (!membership || !membership.organizations) {
+        console.error('No organization found for user:', user.id)
+        setError('Keine Organisation gefunden. Das Setup wurde möglicherweise nicht abgeschlossen.')
+        return
+      }
+
+      setOrganization({
+        id: membership.organization_id,
+        name: (membership.organizations as any).name
+      })
+      setUserRole(membership.role)
+
+      // Hole Buckets mit Tasks - ORG-SCOPE (kein user_id Filter!)
+      const { data: bucketsData } = await supabase
+        .from('buckets')
+        .select(`
+          *,
+          tasks (
+            *,
+            user:profiles (
+              id,
+              name,
+              email
+            ),
+            bucket:buckets (
+              id,
+              name
+            ),
+            project:projects (
+              id,
+              name
+            )
+          )
+        `)
+        .eq('organization_id', membership.organization_id)
+        .order('order_index', { ascending: true })
+
+      // Hole alle Tasks in der Organisation - ORG-SCOPE (kein user_id Filter!)
+      const { data: tasksData } = await supabase
+        .from('tasks')
+        .select(`
+          *,
+          user:profiles (
+            id,
+            name,
+            email
+          ),
+          bucket:buckets (
+            id,
+            name
+          ),
+          project:projects (
+            id,
+            name
+          )
+        `)
+        .eq('organization_id', membership.organization_id)
+        .order('created_at', { ascending: false })
+
+      console.log('Loaded buckets:', bucketsData?.length || 0)
+      console.log('Loaded tasks:', tasksData?.length || 0)
+      console.log('Organization:', membership.organization_id)
+      console.log('User:', user.id)
+      
+      setBuckets(bucketsData || [])
+      setTasks(tasksData || [])
+
+      // Debug-Informationen
+      const debug = {
+        sessionUserId: user.id,
+        orgId: membership.organization_id,
+        counts: { buckets: bucketsData?.length || 0, tasks: tasksData?.length || 0 },
+        sampleBucket: bucketsData?.[0]?.name,
+        membershipRole: membership.role,
+        organizationName: (membership.organizations as any).name
+      }
+      console.log('Debug Info:', debug)
+
+      // Berechne Stats
+      const totalTasks = tasksData?.length || 0
+      const openTasks = tasksData?.filter(t => t.status === 'open').length || 0
+      const completedTasks = tasksData?.filter(t => t.status === 'done').length || 0
+
+      setStats({
+        totalTasks,
+        openTasks,
+        completedTasks,
+        todayTasks: 0,
+        overdueTasks: 0,
+        completedThisWeek: 0,
+        daysSinceOldest: 0,
+        organization: {
+          id: membership.organization_id,
+          name: (membership.organizations as any).name
+        }
+      })
+
+    } catch (error) {
+      console.error('Error loading dashboard data:', error)
+      setError('Fehler beim Laden der Dashboard-Daten.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   const handleDragEnd = async (result: DropResult) => {
     if (!result.destination) return
