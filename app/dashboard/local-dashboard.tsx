@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
-import { Plus, Search, CheckCircle, Circle, Clock, AlertTriangle, Calendar, Settings } from "lucide-react"
+import { Plus, Search, CheckCircle, Circle, Clock, AlertTriangle, Calendar, Settings, ListTodo, User } from "lucide-react"
 import { 
   getBuckets, 
   getTasks, 
@@ -29,7 +29,8 @@ export function LocalDashboard() {
   const [searchTerm, setSearchTerm] = useState("")
   const [hideCompleted, setHideCompleted] = useState(true)
   const [showCalendar, setShowCalendar] = useState(false)
-  const [showSettings, setShowSettings] = useState(false)
+  const [showTasks, setShowTasks] = useState(false)
+  const [showProfile, setShowProfile] = useState(false)
   const [newBucketName, setNewBucketName] = useState("")
   const [newBucketColor, setNewBucketColor] = useState("#e5e7eb")
 
@@ -118,7 +119,7 @@ export function LocalDashboard() {
     setBuckets(prevBuckets => [...prevBuckets, newBucket])
     setNewBucketName("")
     setNewBucketColor("#e5e7eb")
-    setShowSettings(false)
+    setShowTasks(false)
   }
 
   const deleteBucketById = (bucketId: string) => {
@@ -167,6 +168,14 @@ export function LocalDashboard() {
               <Button
                 variant="outline"
                 size="sm"
+                onClick={() => setShowTasks(!showTasks)}
+              >
+                <ListTodo className="w-4 h-4 mr-2" />
+                Aufgaben
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() => setShowCalendar(!showCalendar)}
               >
                 <Calendar className="w-4 h-4 mr-2" />
@@ -175,10 +184,10 @@ export function LocalDashboard() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setShowSettings(!showSettings)}
+                onClick={() => setShowProfile(!showProfile)}
               >
-                <Settings className="w-4 h-4 mr-2" />
-                Einstellungen
+                <User className="w-4 h-4 mr-2" />
+                Profil
               </Button>
             </div>
           </div>
@@ -249,26 +258,120 @@ export function LocalDashboard() {
           </div>
         </div>
 
-        {/* Settings Panel */}
-        {showSettings && (
+        {/* Tasks Panel */}
+        {showTasks && (
           <Card className="mb-6">
             <CardHeader>
-              <CardTitle>Neuen Bucket erstellen</CardTitle>
+              <CardTitle>Aufgaben-Übersicht</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex gap-4">
-                <Input
-                  placeholder="Bucket-Name"
-                  value={newBucketName}
-                  onChange={(e) => setNewBucketName(e.target.value)}
-                />
-                <Input
-                  type="color"
-                  value={newBucketColor}
-                  onChange={(e) => setNewBucketColor(e.target.value)}
-                  className="w-20"
-                />
-                <Button onClick={addNewBucket}>Hinzufügen</Button>
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <h4 className="font-medium mb-2">Alle Aufgaben</h4>
+                    <div className="space-y-2 max-h-60 overflow-y-auto">
+                      {tasks.map(task => (
+                        <div key={task.id} className="flex items-center space-x-2 p-2 bg-gray-50 rounded">
+                          <button
+                            onClick={() => toggleTaskStatus(task.id, task.status)}
+                            className="text-gray-400 hover:text-green-600"
+                          >
+                            {task.status === 'done' ? (
+                              <CheckCircle className="w-4 h-4 text-green-600" />
+                            ) : (
+                              <Circle className="w-4 h-4" />
+                            )}
+                          </button>
+                          <span className={`text-sm ${task.status === 'done' ? 'line-through text-gray-500' : ''}`}>
+                            {task.title}
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            ({buckets.find(b => b.id === task.bucketId)?.name})
+                          </span>
+                        </div>
+                      ))}
+                      {tasks.length === 0 && (
+                        <p className="text-gray-500 text-sm">Keine Aufgaben vorhanden</p>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <h4 className="font-medium mb-2">Neuen Bucket erstellen</h4>
+                    <div className="space-y-2">
+                      <Input
+                        placeholder="Bucket-Name"
+                        value={newBucketName}
+                        onChange={(e) => setNewBucketName(e.target.value)}
+                      />
+                      <div className="flex gap-2">
+                        <Input
+                          type="color"
+                          value={newBucketColor}
+                          onChange={(e) => setNewBucketColor(e.target.value)}
+                          className="w-20"
+                        />
+                        <Button onClick={addNewBucket} className="flex-1">Hinzufügen</Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Profile Panel */}
+        {showProfile && (
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle>Profil & Einstellungen</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div>
+                  <h4 className="font-medium mb-2">Benutzer-Informationen</h4>
+                  <p className="text-sm text-gray-600">
+                    Alle Daten werden lokal in Ihrem Browser gespeichert.
+                  </p>
+                </div>
+                <div>
+                  <h4 className="font-medium mb-2">Daten verwalten</h4>
+                  <div className="flex gap-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => {
+                        const data = {
+                          tasks: getTasks(),
+                          buckets: getBuckets(),
+                          user: getUser()
+                        }
+                        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+                        const url = URL.createObjectURL(blob)
+                        const a = document.createElement('a')
+                        a.href = url
+                        a.download = 'easytasks-backup.json'
+                        a.click()
+                        URL.revokeObjectURL(url)
+                      }}
+                    >
+                      Daten exportieren
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => {
+                        if (confirm('Alle Daten wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.')) {
+                          localStorage.clear()
+                          window.location.reload()
+                        }
+                      }}
+                      className="text-red-600 hover:text-red-700"
+                    >
+                      Alle Daten löschen
+                    </Button>
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>
