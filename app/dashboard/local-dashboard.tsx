@@ -18,6 +18,7 @@ import {
   updateBucket, 
   deleteBucket,
   getStats,
+  getUser,
   LocalTask,
   LocalBucket
 } from "@/lib/localStorage"
