@@ -344,6 +344,38 @@ export function DashboardClient() {
     }
   }
 
+  const repairSetup = async () => {
+    if (!user) return
+
+    try {
+      setError('Repariere Setup...')
+      
+      const response = await fetch('/api/debug/repair-setup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          organizationName: 'Mein Team',
+          organizationType: 'team'
+        })
+      })
+
+      const result = await response.json()
+
+      if (response.ok) {
+        setError('')
+        setSuccess('Setup erfolgreich repariert! Lade Dashboard neu...')
+        // Reload dashboard data
+        await loadDashboardData()
+      } else {
+        setError(`Fehler beim Reparieren: ${result.error}`)
+      }
+    } catch (error) {
+      console.error('Error repairing setup:', error)
+      setError('Fehler beim Reparieren des Setups.')
+    }
+  }
+
   const addNewTask = async (bucketId: string) => {
     const title = prompt("Task-Titel eingeben:")
     if (!title || !user || !organization.id) return
@@ -480,6 +512,17 @@ export function DashboardClient() {
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md mb-6">
             {error}
+            {error.includes('Keine Organisation gefunden') && (
+              <div className="mt-2">
+                <Button 
+                  size="sm" 
+                  onClick={repairSetup}
+                  className="bg-red-600 hover:bg-red-700"
+                >
+                  Setup reparieren
+                </Button>
+              </div>
+            )}
           </div>
         )}
 
